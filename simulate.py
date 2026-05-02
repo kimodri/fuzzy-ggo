@@ -1,7 +1,7 @@
 import argparse
 import time
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button
+from matplotlib.widgets import Button, Slider
 
 error_graph = {
     "ne": [(-30, 1), (-15, 1), (0, 0), (80, 0)],  # negative error
@@ -261,6 +261,104 @@ def get_membership_output(x):
 
     return hi, mi, si, nc, sl, ml, slo
 
+def compute_caps(error, error_dot):
+    ne, ze, se, me, le = get_membership_error(error)
+    impf, imps, s, ws, wf = get_membership_error_dot(error_dot)
+
+    cap_hi = min(ne, impf)                                                      # rule 1
+    cap_mi = max(min(ne, imps), min(se, impf))                                  # rules 2, 6
+    cap_si = max(min(ne, s), min(se, imps), min(me, impf))                      # rules 3, 7, 11
+    cap_nc = max(
+        min(ne, ws),                                                            # rule 4
+        min(ze, impf), min(ze, imps), min(ze, s), min(ze, ws), min(ze, wf),     # rules 21-25
+    )
+    cap_sl = max(min(ne, wf), min(se, s), min(me, imps), min(le, impf))         # rules 5, 8, 12, 16
+    cap_ml = max(
+        min(se, ws), min(se, wf),
+        min(me, s), min(me, ws),
+        min(le, imps), min(le, s),
+    )                                                                           # rules 9, 10, 13, 14, 17, 18
+    cap_slo = max(min(me, wf), min(le, ws), min(le, wf))                        # rules 15, 19, 20
+
+    return {
+        "memberships_e": (ne, ze, se, me, le),
+        "memberships_ed": (impf, imps, s, ws, wf),
+        "caps": (cap_hi, cap_mi, cap_si, cap_nc, cap_sl, cap_ml, cap_slo),
+    }
+
+def compute_centroid(caps):
+    cap_hi, cap_mi, cap_si, cap_nc, cap_sl, cap_ml, cap_slo = caps
+    xs = [i * 0.1 for i in range(-100, 101)]
+    hi_ys, mi_ys, si_ys, nc_ys, sl_ys, ml_ys, slo_ys = [], [], [], [], [], [], []
+    for x in xs:
+        hi_x, mi_x, si_x, nc_x, sl_x, ml_x, slo_x = get_membership_output(x)
+        hi_ys.append(min(hi_x, cap_hi))
+        mi_ys.append(min(mi_x, cap_mi))
+        si_ys.append(min(si_x, cap_si))
+        nc_ys.append(min(nc_x, cap_nc))
+        sl_ys.append(min(sl_x, cap_sl))
+        ml_ys.append(min(ml_x, cap_ml))
+        slo_ys.append(min(slo_x, cap_slo))
+    max_ys = [max(a, b, c, d, e, f, g)
+              for a, b, c, d, e, f, g
+              in zip(hi_ys, mi_ys, si_ys, nc_ys, sl_ys, ml_ys, slo_ys)]
+    sum_xy = sum(x * y for x, y in zip(xs, max_ys))
+    sum_y = sum(max_ys)
+    z = sum_xy / sum_y if sum_y != 0 else 0.0
+    clipped = {"hi": hi_ys, "mi": mi_ys, "si": si_ys,
+               "nc": nc_ys, "sl": sl_ys, "ml": ml_ys, "slo": slo_ys}
+    return xs, clipped, max_ys, z
+
+def draw_aggregated_for_inputs(ax, e, ed):
+    ax.clear()
+    info = compute_caps(e, ed)
+    caps = info["caps"]
+    xs, clipped, max_ys, z = compute_centroid(caps)
+
+    colors = {"hi": "tab:purple", "mi": "tab:blue", "si": "tab:cyan",
+              "nc": "tab:gray", "sl": "tab:olive", "ml": "tab:orange",
+              "slo": "tab:red"}
+    for label, ys in clipped.items():
+        ax.fill_between(xs, 0, ys, alpha=0.25, color=colors[label], label=f"{label} clipped")
+    ax.plot(xs, max_ys, color="black", linewidth=1.5, label="Aggregated (max)")
+    ax.axvline(z, linestyle="--", color="black", label=f"z = {z:.2f}")
+
+    cap_hi, cap_mi, cap_si, cap_nc, cap_sl, cap_ml, cap_slo = caps
+    ax.set_title(f"Aggregated Output  |  hi={cap_hi:.2f} mi={cap_mi:.2f} si={cap_si:.2f} "
+                 f"nc={cap_nc:.2f} sl={cap_sl:.2f} ml={cap_ml:.2f} slo={cap_slo:.2f}",
+                 fontsize=9)
+    ax.set_xlabel("Output (z)")
+    ax.set_ylabel("Membership")
+    ax.set_ylim(-0.05, 1.1)
+    ax.set_xlim(-10, 10)
+    ax.legend(loc="upper right", fontsize=7, ncol=2)
+    ax.grid(True)
+
+def open_explorer():
+    fig, axes = plt.subplots(3, 1, figsize=(9, 9))
+    plt.subplots_adjust(bottom=0.20, hspace=0.5)
+
+    ax_err_slider = plt.axes([0.15, 0.09, 0.7, 0.03])
+    ax_dot_slider = plt.axes([0.15, 0.04, 0.7, 0.03])
+    s_err = Slider(ax_err_slider, "error",     -30, 80, valinit=0)
+    s_dot = Slider(ax_dot_slider, "error_dot", -30, 30, valinit=0)
+
+    def redraw(_=None):
+        e, ed = s_err.val, s_dot.val
+        draw_fuzzy_graph(axes[0], error_graph, "Error",
+                         x_min=-30, x_max=100,
+                         input_value=e, xlabel="Error")
+        draw_fuzzy_graph(axes[1], error_dot_graph, "Error Dot",
+                         x_min=-30, x_max=30,
+                         input_value=ed, xlabel="Error Dot")
+        draw_aggregated_for_inputs(axes[2], e, ed)
+        fig.canvas.draw_idle()
+
+    s_err.on_changed(redraw)
+    s_dot.on_changed(redraw)
+    redraw()
+    plt.show()
+
 
 target_fps = 60
 inital_fps = 48
@@ -299,7 +397,13 @@ parser.add_argument("--target", type=float, default=float(target_fps),
                     help="Target FPS.")
 parser.add_argument("--continuous", action="store_true",
                     help="Run until Ctrl+C instead of auto-stopping when stable.")
+parser.add_argument("--mode", choices=["simulate", "explore"], default="simulate",
+                    help="simulate: run the control loop. explore: open an interactive Mamdani visualization.")
 args = parser.parse_args()
+
+if args.mode == "explore":
+    open_explorer()
+    raise SystemExit
 
 current_fps = float(inital_fps)
 prev_error = 0.0
@@ -330,49 +434,17 @@ try:
         error = args.target - current_fps
         error_dot = error - prev_error
 
-        ne, ze, se, me, le = get_membership_error(error)
-        impf, imps, s, ws, wf = get_membership_error_dot(error_dot)
+        info = compute_caps(error, error_dot)
+        ne, ze, se, me, le = info["memberships_e"]
+        impf, imps, s, ws, wf = info["memberships_ed"]
+        cap_hi, cap_mi, cap_si, cap_nc, cap_sl, cap_ml, cap_slo = info["caps"]
 
         print(f"\n== Tick {tick} ==")
         print_error_membership(ne, ze, se, me, le)
         print_error_dot_membership(impf, imps, s, ws, wf)
-
-        cap_hi = min(ne, impf)                                                      # rule 1
-        cap_mi = max(min(ne, imps), min(se, impf))                                  # rules 2, 6
-        cap_si = max(min(ne, s), min(se, imps), min(me, impf))                      # rules 3, 7, 11
-        cap_nc = max(
-            min(ne, ws),                                                            # rule 4
-            min(ze, impf), min(ze, imps), min(ze, s), min(ze, ws), min(ze, wf),     # rules 21-25
-        )
-        cap_sl = max(min(ne, wf), min(se, s), min(me, imps), min(le, impf))         # rules 5, 8, 12, 16
-        cap_ml = max(
-            min(se, ws), min(se, wf),
-            min(me, s), min(me, ws),
-            min(le, imps), min(le, s),
-        )                                                                           # rules 9, 10, 13, 14, 17, 18
-        cap_slo = max(min(me, wf), min(le, ws), min(le, wf))                        # rules 15, 19, 20
-
         print_rules(cap_hi, cap_mi, cap_si, cap_nc, cap_sl, cap_ml, cap_slo)
 
-        xs = [i * 0.1 for i in range(-100, 101)]
-        hi_ys, mi_ys, si_ys, nc_ys, sl_ys, ml_ys, slo_ys = [], [], [], [], [], [], []
-
-        for x in xs:
-            hi_x, mi_x, si_x, nc_x, sl_x, ml_x, slo_x = get_membership_output(x)
-            hi_ys.append(min(hi_x, cap_hi))
-            mi_ys.append(min(mi_x, cap_mi))
-            si_ys.append(min(si_x, cap_si))
-            nc_ys.append(min(nc_x, cap_nc))
-            sl_ys.append(min(sl_x, cap_sl))
-            ml_ys.append(min(ml_x, cap_ml))
-            slo_ys.append(min(slo_x, cap_slo))
-        max_ys = [max(a, b, c, d, e, f, g)
-                  for a, b, c, d, e, f, g
-                  in zip(hi_ys, mi_ys, si_ys, nc_ys, sl_ys, ml_ys, slo_ys)]
-
-        sum_xy = sum(x * y for x, y in zip(xs, max_ys))
-        sum_y = sum(max_ys)
-        z = sum_xy / sum_y if sum_y != 0 else 0.0
+        _, _, _, z = compute_centroid(info["caps"])
 
         caps = {
             "Strongly increase graphics":   cap_hi,
