@@ -297,9 +297,9 @@ function doTick() {
 
   // Log block (mirrors python print format)
   log(`\n== Tick ${tick} ==`);
-  log(`  Error memberships     : ne=${fmt(ne)}  ze=${fmt(ze)}  se=${fmt(se)}  me=${fmt(me)}  le=${fmt(le)}`);
-  log(`  Error Dot memberships : if=${fmt(impf)}  is=${fmt(imps)}  s=${fmt(s)}  ws=${fmt(ws)}  wf=${fmt(wf)}`);
-  log(`  Rule strengths        : hi=${fmt(cap_hi)}  mi=${fmt(cap_mi)}  si=${fmt(cap_si)}  nc=${fmt(cap_nc)}  sl=${fmt(cap_sl)}  ml=${fmt(cap_ml)}  slo=${fmt(cap_slo)}`);
+  // log(`  Error memberships     : ne=${fmt(ne)}  ze=${fmt(ze)}  se=${fmt(se)}  me=${fmt(me)}  le=${fmt(le)}`);
+  // log(`  Error Dot memberships : if=${fmt(impf)}  is=${fmt(imps)}  s=${fmt(s)}  ws=${fmt(ws)}  wf=${fmt(wf)}`);
+  // log(`  Rule strengths        : hi=${fmt(cap_hi)}  mi=${fmt(cap_mi)}  si=${fmt(cap_si)}  nc=${fmt(cap_nc)}  sl=${fmt(cap_sl)}  ml=${fmt(cap_ml)}  slo=${fmt(cap_slo)}`);
   log(`  State                 : target=${fmt(target)}  current=${fmt(current_fps)}  error=${fmt(error, 2, true)}  error_dot=${fmt(error_dot, 2, true)}`);
   log(`  Defuzz output         : z=${fmt(z)}`);
   log(`  Action                : ${action}`);
