@@ -264,7 +264,7 @@ def get_membership_output(x):
 
 target_fps = 60
 inital_fps = 48
-strength = 5
+# strength = 5
 
 """
 RULES:
@@ -396,8 +396,8 @@ try:
         tick += 1
 
         prev_fps = current_fps
-        # current_fps = max(0, min(100, current_fps + 0.2 * z))
-        current_fps = max(0, min(100, current_fps + (strength * (z/100))))
+        current_fps = max(0, min(100, current_fps + 0.4 * z))
+        # current_fps = max(0, min(100, current_fps + (strength * (z/100))))
         delta = current_fps - prev_fps
         print(f"  Applied               : Δfps={delta:+.4f}  →  new fps={current_fps:.2f}")
 
